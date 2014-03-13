@@ -17,6 +17,11 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 		self::$edit_path = get_option( self::EDIT_PATH_OPTION, self::$edit_path );
 		self::register_settings();
 		add_action( 'gb_router_generate_routes', array( get_class(), 'register_path_callback' ), 100, 1 );
+
+		add_action( 'wp_ajax_nopriv_sec_deactivate_voucher',  array( get_class(), 'maybe_deactivate_voucher' ), 10, 0 );
+		add_action( 'wp_ajax_nopriv_sec_activate_voucher',  array( get_class(), 'maybe_activate_voucher' ), 10, 0 );
+		add_action( 'wp_ajax_sec_deactivate_voucher',  array( get_class(), 'maybe_deactivate_voucher' ), 10, 0 );
+		add_action( 'wp_ajax_sec_activate_voucher',  array( get_class(), 'maybe_activate_voucher' ), 10, 0 );
 	}
 
 	/**
@@ -60,12 +65,13 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 			'page_arguments' => array( self::EDIT_ACCOUNT_QUERY_VAR ),
 			'title_callback' => array( get_class(), 'get_title' ),
 			'page_callback' => array( get_class(), 'on_edit_page' ),
-			'access_callback' => array( get_class(), 'login_required' ),
+			'access_callback' => array( get_class(), 'access_restriction' ),
 			'template' => array(
 				self::get_template_path().'/'.str_replace( '/', '-', self::$edit_path ).'.php', // non-default edit path
 				self::get_template_path().'/form.php', // theme override
 				self::get_template_path().'/merchant.php', // theme override
-				SEC_PATH.'/views/public/merchant.php', // default
+				GB_PATH.'/views/public/merchant.php', // default
+				SEC_PROFILES_REPORT_PATH . '/views/profile-mngt.php', // default
 			),
 		);
 		$router->add_route( self::EDIT_QUERY_VAR, $args );
@@ -89,6 +95,13 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 		}
 	}
 
+	public function access_restriction() {
+		if ( current_user_can( 'delete_posts' ) || apply_filters( 'merchant_can_manage_profiles', FALSE ) ) {
+			return TRUE;
+		}
+		return FALSE;
+	}
+
 	/**
 	 * We're on the edit deal page
 	 *
@@ -105,9 +118,9 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 		}
 
 		self::$account_id = $account_id;
-
-		$account = Group_Buying_Account::get_instance( $account_id );
+		$account = Group_Buying_Account::get_instance_by_id( $account_id );
 		if ( is_a( $account, 'Group_Buying_Account' ) ) {
+			self::$account = $account;
 			// display the edit form
 			$edit_page->view_mngt_profile();
 			return;
@@ -129,12 +142,47 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 		wp_enqueue_style( 'gb_frontend_deal_submit_timepicker_css' );
 
 		$account = self::$account;
-		include( SEC_PROFILES_REPORT_PATH . '/profile-mngt.php' );
+
+		// Credits
+		$types = apply_filters( 'gb_account_credit_types', array() );
+		$credit_fields = array();
+		foreach ( $types as $key => $label ) {
+			$credit_fields[$key] = array(
+				'balance' => $account->get_credit_balance( $key ),
+				'label' => $label,
+			);
+		}
+		$credit_types = apply_filters( 'gb_account_meta_box_credit_types', $credit_fields, $account );
+		// Args for template
+		$args = array(
+			'account' => $account,
+			'first_name' => $account->get_name( 'first' ),
+			'last_name' => $account->get_name( 'last' ),
+			'street' => isset( $address['street'] )?$address['street']:'',
+			'city' => isset( $address['city'] )?$address['city']:'',
+			'zone' => isset( $address['zone'] )?$address['zone']:'',
+			'postal_code' => isset( $address['postal_code'] )?$address['postal_code']:'',
+			'country' => isset( $address['country'] )?$address['country']:'',
+			'mobile' => $account->get_name( 'first' ),
+			'purchases' => Group_Buying_Purchase::get_purchases( array( 'account' => $account->get_ID() ) ),
+			'credit_types' => $credit_fields
+			);
+		if ( defined( 'Registration_Fields::MOBILE' ) ) {
+			$args['mobile_code'] = get_post_meta( $account->get_ID(), '_'.Registration_Fields::MOBILE_CODE, TRUE );
+			$args['mobile'] = get_post_meta( $account->get_ID(), '_'.Registration_Fields::MOBILE, TRUE );
+		}
+		$args = apply_filters( 'load_view_args_profile-mngt', $args );
+		if ( !empty( $args ) ) extract( $args );
+
+		// Show the form
+		include( SEC_PROFILES_REPORT_PATH . '/views/profile-mngt-forms.php' );
 	}
 
 	public function get_title( $title ) {
-		$title = get_the_title( self::$offer_id );
-		return sprintf( self::__( "Edit: %s" ), $title );
+		$account = Group_Buying_Account::get_instance_by_id( self::$account_id );
+		$account_name = $account->get_name();
+		$name = ( strlen( $account_name ) <= 1  ) ? get_the_title( $account->get_ID() ) : $account_name;
+		return sprintf( self::__( "Account: %s" ), $name );
 	}
 
 	/**
@@ -167,13 +215,76 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 
 	private function __construct() {
 		self::do_not_cache();
-		if ( isset( $_POST['gb_account_action'] ) && $_POST['gb_account_action'] == self::FORM_ACTION ) {
+		if ( isset( $_POST['profile_mngt_form_nonce'] ) && wp_verify_nonce( $_POST['profile_mngt_form_nonce'], 'sec_form_action' ) ) {
 			$this->process_form_submission();
 		}
 	}
 
 	private function process_form_submission() {
-		error_log( 'post: ' . print_r( $_POST, TRUE ) );
+		if ( isset( $_POST['mngt_account_id'] ) ) {
+			$account = Group_Buying_Account::get_instance_by_id( $_POST['mngt_account_id'] );
+		}
+		if ( is_a( $account, 'Group_Buying_Account' ) ) {
+			// save mobile
+			if ( defined( 'Registration_Fields::MOBILE' ) ) {
+				if ( isset( $_POST['account_mobile'] ) ) {
+					$phone = preg_replace( '/[^0-9]/', '', $_POST['account_mobile'] );
+					delete_post_meta( $account->get_ID(), '_'.Registration_Fields::MOBILE );
+					add_post_meta( $account->get_ID(), '_'.Registration_Fields::MOBILE, $phone );
+				}
+			}
+			// save credit updates
+			Group_Buying_Accounts::save_meta_box_gb_account_credits( $account, $account->get_id(), '' );
+		}
+		
+	}
+
+
+
+	public static function maybe_deactivate_voucher() {
+
+		if ( !isset( $_REQUEST['deactivate_voucher_nonce'] ) )
+			wp_die( 'Forget something?' );
+
+		$nonce = $_REQUEST['deactivate_voucher_nonce'];
+		if ( !wp_verify_nonce( $nonce, Group_Buying_Destroy::NONCE ) )
+        	wp_die( 'Not going to fall for it!' );
+
+        if ( current_user_can( 'delete_posts' ) || apply_filters( 'merchant_can_manage_profiles', FALSE ) ) {
+
+			$voucher_id = $_REQUEST['voucher_id'];
+			$voucher = Group_Buying_Voucher::get_instance( $voucher_id );
+			if ( !is_a( $voucher, 'Group_Buying_Voucher' ) )
+				return;
+
+			if ( $voucher->is_active() ) {
+				$voucher->mark_pending();
+				do_action( 'gb_voucher_deactivated', $voucher_id );
+			}
+		}
+	}
+
+	public static function maybe_activate_voucher() {
+
+		if ( !isset( $_REQUEST['activate_voucher_nonce'] ) )
+			wp_die( 'Forget something?' );
+
+		$nonce = $_REQUEST['activate_voucher_nonce'];
+		if ( !wp_verify_nonce( $nonce, Group_Buying_Destroy::NONCE ) )
+        	wp_die( 'Not going to fall for it!' );
+
+        if ( current_user_can( 'delete_posts' ) || apply_filters( 'merchant_can_manage_profiles', FALSE ) ) {
+
+			$voucher_id = $_REQUEST['voucher_id'];
+			$voucher = Group_Buying_Voucher::get_instance( $voucher_id );
+			if ( !is_a( $voucher, 'Group_Buying_Voucher' ) )
+				return;
+
+			if ( $voucher->is_active() ) {
+				$voucher->activate();
+				do_action( 'gb_voucher_activated', $voucher_id );
+			}
+		}
 	}
 
 }

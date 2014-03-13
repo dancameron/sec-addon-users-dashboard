@@ -16,6 +16,6 @@ jQuery(document).ready(function($){
 	<form id="summary_sales_start_date" action="<?php echo $report->get_url() ?>" method="post">
 			<?php gb_e('Start:') ?> <input type="text" value="<?php echo date( 'm/d/Y', $start_time ); ?>" name="summary_sales_start_date" id="gb_deal_summary_sales_start_date" />
 			<?php gb_e('End:') ?> <input type="text" value="<?php echo date( 'm/d/Y', $time ); ?>" name="summary_sales_end_date" id="gb_deal_summary_sales_end_date" />
-		<input type="submit" class="submit button">
+		<input type="submit" class="form-submit submit" >
 	</form>
 </div>

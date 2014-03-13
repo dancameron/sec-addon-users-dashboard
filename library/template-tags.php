@@ -5,7 +5,7 @@
  * @return  
  */
 function sec_get_users_report_url() {
-	if ( self::using_permalinks() ) {
+	if ( Group_Buying_Controller::using_permalinks() ) {
 		$link = add_query_arg( array( 'report' => SEC_Report_Users::REPORT_SLUG ), home_url( trailingslashit( get_option( Group_Buying_Reports::REPORTS_PATH_OPTION ) ) ) );
 	} else {
 		$link = add_query_arg( array( Group_Buying_Reports::REPORT_QUERY_VAR => 1, 'report' => SEC_Report_Users::REPORT_SLUG  ), home_url() );

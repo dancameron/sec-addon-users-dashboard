@@ -40,6 +40,11 @@ class SEC_Report_Users extends Group_Buying_Controller {
 	}
 
 	public function create_report( $report = TRUE ) {
+		
+		if ( !current_user_can( 'delete_posts' ) && !apply_filters( 'merchant_can_manage_profiles', FALSE ) ) { // cannot manage profiles
+			if ( !apply_filters( 'merchant_can_view_profiles_report', FALSE ) ) // allow for some to view the report
+				return;
+		}		
 
 		if ( $report->report != self::REPORT_SLUG )
 			return;
@@ -48,7 +53,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 
 		$report->columns = apply_filters( 'set_account_profiles_report_data_column', self::get_profile_summary_columns() );
 
-		$filter = ( isset( $_GET['filter']  && in_array( $_GET['filter'], array( 'any', 'publish', 'draft', 'private', 'trash' ) ) ) ? $_GET['filter'] : 'publish';
+		$filter = ( isset( $_GET['filter'] ) && in_array( $_GET['filter'], array( 'any', 'publish', 'draft', 'private', 'trash' ) ) ) ? $_GET['filter'] : 'publish';
 
 		$start_time = ( isset( $_REQUEST['account_profiles_start_date'] ) && strtotime( $_REQUEST['account_profiles_start_date'] ) <= current_time( 'timestamp' ) ) ? $_REQUEST['account_profiles_start_date'] : date( 'm/d/Y', current_time( 'timestamp' )-31536000 );
   		$end_time = ( isset( $_REQUEST['account_profiles_end_date'] ) && strtotime( $_REQUEST['account_profiles_end_date'] ) <= current_time( 'timestamp' ) ) ? $_REQUEST['account_profiles_end_date'] : date( 'm/d/Y', current_time( 'timestamp' ) );
@@ -149,7 +154,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 					$reward_credits = gb_get_account_balance( $user_id, SEC_Affiliates::CREDIT_TYPE );
 
 					$accounts[] = apply_filters( 'gb_accounts_record_item', array(
-							'id' => get_the_ID(),
+							'id' => $account_id,
 							'name' => '<a href="'.sec_get_account_profile_mngt_url( $account_id ).'">'.$name.'</a>',
 							'mobile' => $mobile,
 							'purchase_total' => count( $purchases ),
