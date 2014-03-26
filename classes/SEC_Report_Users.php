@@ -68,13 +68,20 @@ class SEC_Report_Users extends Group_Buying_Controller {
 		 */
 		$columns = array(
 			'name' => self::__( 'Name' ),
-			'purchase_total' => self::__( 'Orders' ),
-			'purchase_offers_total' => self::__( 'Purchased' ),
-			'rewards' => self::__( 'Rewards' ),
-			'gift' => self::__( 'Gift' )
+			'gift' => self::__( 'Gift' ),
+			'purchase_total' => self::__( 'Purchases' ),
+			'purchase_offers_total' => self::__( 'Deals Purchased' ),
+			'rewards' => self::__( 'Rewards' )
 		);
 		if ( class_exists( 'Registration_Fields' ) && defined( 'Registration_Fields::MOBILE_CODE' ) ) {
-			$columns['mobile'] = self::__( 'Mobile' );
+			$columns = array(
+				'name' => self::__( 'Name' ),
+				'mobile' => self::__( 'Mobile' ),
+				'gift' => self::__( 'Gift' ),
+				'purchase_total' => self::__( 'Purchases' ),
+				'purchase_offers_total' => self::__( 'Deals Purchased' ),
+				'rewards' => self::__( 'Rewards' )
+			);
 		}
 		return $columns;
 	}
@@ -93,7 +100,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 
 		$showpage = ( isset( $_GET['showpage'] ) ) ? (int)$_GET['showpage']+1 : 1 ;
 		$args=array(
-			'post_type' => SEC_Account::POST_TYPE,
+			'post_type' => Group_Buying_Account::POST_TYPE,
 			'post_status' => 'publish',
 			'posts_per_page' => apply_filters( 'gb_reports_show_records', 50, 'account_profiles' ),
 			'paged' => $showpage,
@@ -117,7 +124,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 					// Personal Info
 					$account_name = $account->get_name();
 					$name = ( strlen( $account_name ) <= 1  ) ? get_the_title( $account->get_ID() ) : $account_name;
-					$user_id = SEC_Account::get_user_id_for_account( $account->get_ID() );
+					$user_id = Group_Buying_Account::get_user_id_for_account( $account->get_ID() );
 					// $user_data = get_userdata( $user_id );
 
 					// mobile
@@ -127,7 +134,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 					}
 
 					// Purchases
-					$purchases = SEC_Purchase::get_purchases( array(
+					$purchases = Group_Buying_Purchase::get_purchases( array(
 						'user' => $user_id,
 					) );
 					$purchased_offer_ids = gb_get_purchased_deals( $user_id );
@@ -151,14 +158,14 @@ class SEC_Report_Users extends Group_Buying_Controller {
 					
 					// Credits
 					$credits = gb_get_account_balance( $user_id );
-					$reward_credits = gb_get_account_balance( $user_id, SEC_Affiliates::CREDIT_TYPE );
+					$reward_credits = gb_get_account_balance( $user_id, Group_Buying_Affiliates::CREDIT_TYPE );
 
 					$accounts[] = apply_filters( 'gb_accounts_record_item', array(
 							'id' => $account_id,
 							'name' => '<a href="'.sec_get_account_profile_mngt_url( $account_id ).'">'.$name.'</a>',
 							'mobile' => $mobile,
 							'purchase_total' => count( $purchases ),
-							'purchase_offers_total' => count( $purchased_offer_ids ),
+							'purchase_offers_total' => '<a href="'.sec_get_account_profile_mngt_url( $account_id ).'">'.count( $purchased_offer_ids ).'</a>',
 							'gift' => implode( ', ', $gifts_purchased ),
 							'rewards' => $reward_credits
 						), $account );

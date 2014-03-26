@@ -234,9 +234,44 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 				}
 			}
 			// save credit updates
-			Group_Buying_Accounts::save_meta_box_gb_account_credits( $account, $account->get_id(), '' );
+			if ( is_callable( array( 'Group_Buying_Accounts', 'save_meta_box_gb_account_credits' ) ) ) {
+				Group_Buying_Accounts::save_meta_box_gb_account_credits( $account, $account->get_id(), '' );
+			} 
+			else {
+				self::_save_meta_box_gb_account_credits( $account, $account->get_id() );
+			}
+			
 		}
-		
+	}
+
+	private static function _save_meta_box_gb_account_credits( Group_Buying_Account $account ) {
+		if ( isset( $_POST['account_credit_balance'] ) && is_array( $_POST['account_credit_balance'] ) ) {
+			$types = array_keys( apply_filters( 'gb_account_credit_types', array() ) );
+			foreach ( $_POST['account_credit_balance'] as $key => $value ) {
+				if ( in_array( $key, $types ) && is_numeric( $value ) ) {
+					$balance = $account->get_credit_balance( $key );
+					switch ( $_POST['account_credit_action'][$key] ) {
+					case 'add':
+						$total = $balance+$value;
+						break;
+					case 'deduct':
+						$total = $balance-$value;
+						break;
+					case 'change':
+						$total = $value;
+						break;
+					}
+					$account->set_credit_balance( $total, $key );
+					$data = array();
+					$data['note'] = $_POST['account_credit_notes'][$key];
+					$data['adjustment_value'] = $value;
+					$data['current_total'] = $total;
+					$data['prior_total'] = $balance;
+					do_action( 'gb_new_record', $data, Group_Buying_Accounts::$record_type . '_' . $key, gb__( 'Credit Adjustment' ), get_current_user_id(), $account->get_ID() );
+					do_action( 'gb_save_meta_box_gb_account_credits', $account, 0, $_POST );
+				}
+			}
+		}
 	}
 
 

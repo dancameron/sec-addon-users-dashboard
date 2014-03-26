@@ -155,7 +155,7 @@
 
 		$records = Group_Buying_Record::get_records_by_type_and_association( $account->get_ID(), Group_Buying_Accounts::$record_type . '_' . $key );
 
-		if ( apply_filters( 'gb_include_purchases_in_creditlog', '__return_true' ) ) {
+		if ( apply_filters( 'gb_include_purchases_in_creditlog', TRUE ) ) {
 			$purchases = Group_Buying_Purchase::get_purchases( array( 'account' => $account->get_ID() ) );
 		} else {
 			$purchases = array();
@@ -197,22 +197,16 @@
 					// Offer names
 					$products = $purchase->get_products();
 					$offer_names = array();
-					if ( !empty( $purchases ) ) {
-						foreach ( $purchases as $purchase_id ) {
-							$purchase = Group_Buying_Purchase::get_instance( $purchase_id );
-							$products = $purchase->get_products();
-							foreach ( $products as $product ) {
-								$offer_names[] = get_the_title( $product['deal_id'] );
-							}
-						}
-						$items[get_the_time( 'U', $purchase_id )] = array(
-							'date' => get_the_time( 'U', $purchase_id ),
-							'recorded' => gb__( 'Customer' ),
-							'note' =>  gb__('Purchased: ').' '.implode( ', ', $offer_names ),
-							'amount' => number_format( floatval( $amount ), 2 ),
-							'total' => gb__( 'N/A' ),
-						);
+					foreach ( $products as $product ) {
+						$offer_names[] = get_the_title( $product['deal_id'] );
 					}
+					$items[get_the_time( 'U', $purchase_id )] = array(
+						'date' => get_the_time( 'U', $purchase_id ),
+						'recorded' => gb__( 'Customer' ),
+						'note' =>  gb__('Order #').$purchase_id.' '.implode( ', ', $offer_names ),
+						'amount' => number_format( floatval( $amount ), 2 ),
+						'total' => gb__( 'N/A' ),
+					);
 				}
 			}
 			uasort( $items, array( 'Group_Buying_Records', 'sort_callback' ) );
