@@ -55,9 +55,8 @@ class SEC_Report_Users extends Group_Buying_Controller {
 
 		$filter = ( isset( $_GET['filter'] ) && in_array( $_GET['filter'], array( 'any', 'publish', 'draft', 'private', 'trash' ) ) ) ? $_GET['filter'] : 'publish';
 
-		$start_time = ( isset( $_REQUEST['account_profiles_start_date'] ) && strtotime( $_REQUEST['account_profiles_start_date'] ) <= current_time( 'timestamp' ) ) ? $_REQUEST['account_profiles_start_date'] : date( 'm/d/Y', current_time( 'timestamp' )-31536000 );
-  		$end_time = ( isset( $_REQUEST['account_profiles_end_date'] ) && strtotime( $_REQUEST['account_profiles_end_date'] ) <= current_time( 'timestamp' ) ) ? $_REQUEST['account_profiles_end_date'] : date( 'm/d/Y', current_time( 'timestamp' ) );
-
+		$start_time = ( isset( $_REQUEST['summary_sales_start_date'] ) && strtotime( $_REQUEST['summary_sales_start_date'] ) <= current_time( 'timestamp' ) ) ? strtotime( $_REQUEST['summary_sales_start_date'] ) : current_time( 'timestamp' )-604800;
+  		$end_time = ( isset( $_REQUEST['summary_sales_end_date'] ) && strtotime( $_REQUEST['summary_sales_end_date'] ) <= current_time( 'timestamp' ) ) ? strtotime( $_REQUEST['summary_sales_end_date'] ) : current_time( 'timestamp' );
 		$report->records = apply_filters( 'set_account_profiles_report_records', self::get_purchase_array( gb_account_merchant_id(), $start_time, $end_time, $filter ) );
 	}
 
@@ -86,11 +85,11 @@ class SEC_Report_Users extends Group_Buying_Controller {
 		return $columns;
 	}
 
-	public function get_purchase_array( $account_merchant_id, $start_time = 'm/d/Y', $time = 'm/d/Y', $filter = 'publish' ) {
+	public function get_purchase_array( $account_merchant_id, $start_time = 0, $end_time = 0, $filter = 'publish' ) {
 		// Paginations
 		global $gb_report_pages;
 		// Pagination variable
-		$showpage = ( isset( $_GET['showpage'] ) ) ? (int)$_GET['showpage']+1 : 1 ;
+		$showpage = ( isset( $_GET['showpage'] ) ) ? (int) $_GET['showpage'] + 1 : 1 ;
 
 		// Build an array of merchant's Deals.
 		$merchants_deal_ids = array();
@@ -98,8 +97,8 @@ class SEC_Report_Users extends Group_Buying_Controller {
 			$merchants_deal_ids = gb_get_merchants_deal_ids( $account_merchant_id );
 		}
 
-		$showpage = ( isset( $_GET['showpage'] ) ) ? (int)$_GET['showpage']+1 : 1 ;
-		$args=array(
+		$showpage = ( isset( $_GET['showpage'] ) ) ? (int) $_GET['showpage'] + 1 : 1 ;
+		$args = array(
 			'post_type' => Group_Buying_Account::POST_TYPE,
 			'post_status' => 'publish',
 			'posts_per_page' => apply_filters( 'gb_reports_show_records', 50, 'account_profiles' ),
@@ -107,8 +106,8 @@ class SEC_Report_Users extends Group_Buying_Controller {
 			'fields' => 'ids',
 			'date_query' => array(
 					array(
-						'after'     => $start_time,
-						'before'    => date( 'm/d/Y', strtotime( $time )+86400 ), // Add a day since it will not count the date selected otherwise.
+						'after'     => date( 'm/d/Y', $start_time ),
+						'before'    => date( 'm/d/Y', $end_time + 86400 ), // Add a day since it will not count the date selected otherwise.
 						'inclusive' => true,
 					),
 				),
@@ -117,7 +116,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 		$gb_report_pages = $account_query->max_num_pages; // set the global for later pagination
 
 		$accounts = array();
-		if ( !empty( $account_query->posts ) ) {
+		if ( ! empty( $account_query->posts ) ) {
 			foreach ( $account_query->posts as $account_id ) {
 				$account = Group_Buying_Account::get_instance_by_id( $account_id );
 				if ( is_a( $account, 'Group_Buying_Account' ) ) {
@@ -130,7 +129,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 					// mobile
 					$mobile = '';
 					if ( defined( 'Registration_Fields::MOBILE_CODE' ) ) {
-						$mobile = get_post_meta( $account->get_ID(), '_'.Registration_Fields::MOBILE_CODE, TRUE ) . ' ' . get_post_meta( $account->get_ID(), '_'.Registration_Fields::MOBILE, TRUE );
+						$mobile = get_post_meta( $account->get_ID(), '_' .Registration_Fields::MOBILE_CODE, TRUE ) . ' ' . get_post_meta( $account->get_ID(), '_' .Registration_Fields::MOBILE, TRUE );
 					}
 
 					// Purchases
@@ -141,21 +140,21 @@ class SEC_Report_Users extends Group_Buying_Controller {
 
 					// gift
 					$gifts_purchased = array(); // build an array of all the titles
-					if ( !empty( $purchased_offer_ids ) ) {
+					if ( ! empty( $purchased_offer_ids ) ) {
 						$query_args = array( // search through all purchased offer ids for the gifts
 								'post_type' => gb_get_deal_post_type(),
 								gb_get_deal_cat_slug() => self::GIFT_TERM,
 								'post_status' => 'any',
 								'posts_per_page' => -1,
 								'fields' => 'ids',
-								'post__in' => $purchased_offer_ids
+								'post__in' => $purchased_offer_ids,
 							);
 						$gift_ids = get_posts( $query_args );
 						foreach ( $gift_ids as $gift_id ) {
 							$gifts_purchased[] = '<a href="'.get_permalink( $gift_id ).'">'.get_the_title( $gift_id ).'</a>';
 						}
 					}
-					
+
 					// Credits
 					$credits = gb_get_account_balance( $user_id );
 					$reward_credits = gb_get_account_balance( $user_id, Group_Buying_Affiliates::CREDIT_TYPE );
@@ -167,7 +166,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 							'purchase_total' => count( $purchases ),
 							'purchase_offers_total' => '<a href="'.sec_get_account_profile_mngt_url( $account_id ).'">'.count( $purchased_offer_ids ).'</a>',
 							'gift' => implode( ', ', $gifts_purchased ),
-							'rewards' => $reward_credits
+							'rewards' => (int) $reward_credits,
 						), $account );
 				}
 			}

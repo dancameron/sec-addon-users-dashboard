@@ -16,7 +16,7 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 	public static function init() {
 		self::$edit_path = get_option( self::EDIT_PATH_OPTION, self::$edit_path );
 		self::register_settings();
-		add_action( 'gb_router_generate_routes', array( get_class(), 'register_path_callback' ), 100, 1 );
+		add_action( 'gb_router_generate_routes', array( get_class(), 'register_route_callback' ), 100, 1 );
 
 		add_action( 'wp_ajax_nopriv_sec_deactivate_voucher',  array( get_class(), 'maybe_deactivate_voucher' ), 10, 0 );
 		add_action( 'wp_ajax_nopriv_sec_activate_voucher',  array( get_class(), 'maybe_activate_voucher' ), 10, 0 );
@@ -55,7 +55,7 @@ class SEC_Report_User_Profiles extends Group_Buying_Controller {
 	 * @param GB_Router $router
 	 * @return void
 	 */
-	public static function register_path_callback( GB_Router $router ) {
+	public static function register_route_callback( GB_Router $router ) {
 		$args = array(
 			'path' => trailingslashit( self::$edit_path ). '([^/]+)/?$',
 			'query_vars' => array(
