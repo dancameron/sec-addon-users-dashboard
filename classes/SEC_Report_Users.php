@@ -104,6 +104,7 @@ class SEC_Report_Users extends Group_Buying_Controller {
 			'posts_per_page' => apply_filters( 'gb_reports_show_records', 50, 'account_profiles' ),
 			'paged' => $showpage,
 			'fields' => 'ids',
+			'gb_bypass_filter' => true,
 			'date_query' => array(
 					array(
 						'after'     => date( 'm/d/Y', $start_time ),
